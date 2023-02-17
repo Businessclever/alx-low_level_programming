@@ -1,7 +1,7 @@
 #include <stdio.h>
 /**
  * main - A programme that prints a lin woith puts function
- * Return: 0;
+ * Return: 0(success)
  */
 int main(void)
 {
