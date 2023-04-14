@@ -1,69 +1,53 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
 
 #define BUFFER_SIZE 1024
 
-void error(const char *msg);
-void close_file(int fd);
-int copy_file(const char *src, const char *dest);
+void print_error_and_exit(const char *error_message, int exit_code);
+void copy_file(const char *file_from, const char *file_to);
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     if (argc != 3) {
-        error("Usage: cp file_from file_to");
+        print_error_and_exit("Usage: cp file_from file_to\n", 97);
     }
 
-    int ret = copy_file(argv[1], argv[2]);
-    if (ret != 0) {
-        exit(ret);
-    }
+    const char *file_from = argv[1];
+    const char *file_to = argv[2];
+
+    copy_file(file_from, file_to);
 
     return 0;
 }
 
-void error(const char *msg)
-{
-    fprintf(stderr, "Error: %s\n", msg);
-    exit(1);
+void print_error_and_exit(const char *error_message, int exit_code) {
+    fprintf(stderr, "%s", error_message);
+    exit(exit_code);
 }
 
-void close_file(int fd)
-{
-    if (close(fd) == -1) {
-        error("Can't close file");
-    }
-}
-
-int copy_file(const char *src, const char *dest)
-{
-    int fd_src = open(src, O_RDONLY);
-    if (fd_src == -1) {
-        error("Can't read from source file");
+void copy_file(const char *file_from, const char *file_to) {
+    FILE *fp_from = fopen(file_from, "r");
+    if (fp_from == NULL) {
+        print_error_and_exit("Error: Can't read from file %s\n", 98);
     }
 
-    int fd_dest = open(dest, O_WRONLY | O_CREAT | O_TRUNC, 0664);
-    if (fd_dest == -1) {
-        close_file(fd_src);
-        error("Can't write to destination file");
+    FILE *fp_to = fopen(file_to, "w");
+    if (fp_to == NULL) {
+        fclose(fp_from);
+        print_error_and_exit("Error: Can't write to %s\n", 99);
     }
 
     char buffer[BUFFER_SIZE];
-    ssize_t nread;
+    size_t num_bytes_read;
 
-    while ((nread = read(fd_src, buffer, BUFFER_SIZE)) > 0) {
-        ssize_t nwritten = write(fd_dest, buffer, nread);
-        if (nwritten != nread) {
-            close_file(fd_src);
-            close_file(fd_dest);
-            error("Error while copying file");
+    while ((num_bytes_read = fread(buffer, 1, BUFFER_SIZE, fp_from)) > 0) {
+        if (fwrite(buffer, 1, num_bytes_read, fp_to) != num_bytes_read) {
+            fclose(fp_from);
+            fclose(fp_to);
+            print_error_and_exit("Error: Can't write to %s\n", 99);
         }
     }
 
-    close_file(fd_src);
-    close_file(fd_dest);
-
-    return 0;
+    fclose(fp_from);
+    fclose(fp_to);
 }
 
