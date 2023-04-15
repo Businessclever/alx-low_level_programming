@@ -1,58 +1,61 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <fcntl.h>
+#include <unistd.h>
 
-void close_file(int fd, char *filename) {
-    if (close(fd) == -1) {
-        dprintf(STDERR_FILENO, "Error: Can't close fd %d\n", fd);
-        dprintf(STDERR_FILENO, "Error: Can't close file %s\n", filename);
-        exit(100);
+#define BUFSIZE 1024
+
+void print_error(char *msg, int exit_code);
+void close_file(int fd);
+void copy_file(char *src_file, char *dest_file);
+
+int main(int argc, char **argv) {
+    if (argc != 3) {
+        print_error("Usage: cp source_file destination_file\n", 97);
     }
+
+    copy_file(argv[1], argv[2]);
+
+    return 0;
 }
 
-int main(int argc, char *argv[]) {
-    int file_from, file_to, read_return_value, write_return_value;
-    char buffer[1024];
+void copy_file(char *src_file, char *dest_file) {
+    char buffer[BUFSIZE];
+    int src_fd, dest_fd, bytes_read, bytes_written;
 
-    if (argc != 3) {
-        dprintf(STDERR_FILENO, "Usage: cp file_from file_to\n");
-        exit(97);
+    src_fd = open(src_file, O_RDONLY);
+    if (src_fd < 0) {
+        print_error("Error: Cannot open source file.\n", 98);
     }
 
-    file_from = open(argv[1], O_RDONLY);
-    if (file_from == -1) {
-        dprintf(STDERR_FILENO, "Error: Can't read from file %s\n", argv[1]);
-        exit(98);
+    dest_fd = open(dest_file, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (dest_fd < 0) {
+        print_error("Error: Cannot create destination file.\n", 99);
     }
 
-    file_to = open(argv[2], O_CREAT | O_WRONLY | O_TRUNC, 0664);
-    if (file_to == -1) {
-        dprintf(STDERR_FILENO, "Error: Can't write to %s\n", argv[2]);
-        exit(99);
-    }
+    while ((bytes_read = read(src_fd, buffer, BUFSIZE))) {
+        if (bytes_read < 0) {
+            print_error("Error: Cannot read from source file.\n", 98);
+        }
 
-    while ((read_return_value = read(file_from, buffer, 1024)) > 0) {
-        write_return_value = write(file_to, buffer, read_return_value);
-        if (write_return_value != read_return_value) {
-            dprintf(STDERR_FILENO, "Error: Can't write to %s\n", argv[2]);
-            exit(99);
+        bytes_written = write(dest_fd, buffer, bytes_read);
+        if (bytes_written < 0) {
+            print_error("Error: Cannot write to destination file.\n", 99);
         }
     }
 
-    if (read_return_value == -1) {
-        dprintf(STDERR_FILENO, "Error: Can't read from file %s\n", argv[1]);
-        exit(98);
-    }
+    close_file(src_fd);
+    close_file(dest_fd);
+}
 
-    if (close(file_from) == -1) {
-        close_file(file_from, argv[1]);
+void close_file(int fd) {
+    if (close(fd) < 0) {
+        print_error("Error: Cannot close file descriptor.\n", 100);
     }
+}
 
-    if (close(file_to) == -1) {
-        close_file(file_to, argv[2]);
-    }
-
-    return 0;
+void print_error(char *msg, int exit_code) {
+    fprintf(stderr, "%s", msg);
+    exit(exit_code);
 }
 
